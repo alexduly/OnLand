@@ -1,7 +1,7 @@
 services:
   preprocessing:
     image: "landwater-preprocessing"
-    build: 
+    build:
       context: preprocessing/
       dockerfile: Dockerfile.dev
     container_name: preprocessing
@@ -17,19 +17,18 @@ services:
       QGIS_SERVER_WMS_MAX_WIDTH: 5000
       PYTHONPATH: "/usr/share/qgis/python/plugins"
     volumes:
-      - ../preprocessing:/workspaces:cached  
-      - ../preprocessing/data/input:/workspaces/data/input
+      - ../preprocessing:/workspaces:cached
       - shared_data:/workspaces/data/output
     restart: unless-stopped
-  
+
   rust:
     image: "mcr.microsoft.com/devcontainers/rust:1-1-bullseye"
     container_name: rust
-    platform: linux/amd64 # think this is 
-    entrypoint: [ "zsh", "-c", "while sleep 1000; do :; done" ]
+    platform: linux/amd64 # think this is
+    entrypoint: ["zsh", "-c", "while sleep 1000; do :; done"]
     volumes:
-      - ../rust:/workspaces:cached  
-      - shared_data:/data:ro 
+      - ../rust:/workspaces:cached
+      - shared_data:/data:ro
 
     restart: unless-stopped
 
