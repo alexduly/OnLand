@@ -1,0 +1,2 @@
+FROM  qgis/qgis-server:stable
+RUN apt -y update && apt install python3-tqdm

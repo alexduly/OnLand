@@ -1,6 +1,10 @@
 services:
   preprocessing:
-    image: "qgis/qgis-server:stable"
+    image: "landwater-preprocessing"
+    build: 
+      context: preprocessing/
+      dockerfile: Dockerfile.dev
+    container_name: preprocessing
     platform: linux/amd64 # think this is neededa
     environment:
       # Do not run the embedded copy of nginx
@@ -20,11 +24,12 @@ services:
   
   rust:
     image: "mcr.microsoft.com/devcontainers/rust:1-1-bullseye"
-    platform: linux/amd64 # think this is neededa
+    container_name: rust
+    platform: linux/amd64 # think this is 
     entrypoint: [ "zsh", "-c", "while sleep 1000; do :; done" ]
     volumes:
-      - ../rust:/workspaces:cached  # Mount the parent directory into the container's /workspaces directory
-      - shared_data:/data:ro # rust env only reads 
+      - ../rust:/workspaces:cached  
+      - shared_data:/data:ro 
 
     restart: unless-stopped
 

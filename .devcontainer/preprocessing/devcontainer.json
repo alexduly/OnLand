@@ -5,8 +5,20 @@
     ],
     "service": "preprocessing",
     "workspaceFolder": "/workspaces",
-    "remoteUser": "root",
+    "remoteUser": "ubuntu",
     "forwardPorts": [],
-    "shutdownAction": "none"
+    "shutdownAction": "none",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.isort",
+                "ms-python.autopep8",
+                "fill-labs.dependi",
+                "ms-python.debugpy",
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ]
+        }
+    }
   }
   
