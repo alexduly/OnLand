@@ -1,0 +1,32 @@
+services:
+  preprocessing:
+    image: "qgis/qgis-server:stable"
+    platform: linux/amd64 # think this is neededa
+    environment:
+      # Do not run the embedded copy of nginx
+      SKIP_NGINX: "true"
+      # Improve rendering performance
+      QGIS_SERVER_PARALLEL_RENDERING: "true"
+      QGIS_SERVER_MAX_THREADS: 4
+      # Limit the maximum size returned by a GetMap
+      QGIS_SERVER_WMS_MAX_HEIGHT: 5000
+      QGIS_SERVER_WMS_MAX_WIDTH: 5000
+      PYTHONPATH: "/usr/share/qgis/python/plugins"
+    volumes:
+      - ../preprocessing:/workspaces:cached  
+      - ../preprocessing/data/input:/workspaces/data/input
+      - shared_data:/workspaces/data/output
+    restart: unless-stopped
+  
+  rust:
+    image: "mcr.microsoft.com/devcontainers/rust:1-1-bullseye"
+    platform: linux/amd64 # think this is neededa
+    entrypoint: [ "zsh", "-c", "while sleep 1000; do :; done" ]
+    volumes:
+      - ../rust:/workspaces:cached  # Mount the parent directory into the container's /workspaces directory
+      - shared_data:/data:ro # rust env only reads 
+
+    restart: unless-stopped
+
+volumes:
+  shared_data:

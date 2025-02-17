@@ -1,0 +1,9 @@
+[package]
+name = "LandOrWater"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+geo = "0.29.3"
+geo-types = "0.7.15"
+shapefile = {version = "0.6.0", features=["geo-types"]}

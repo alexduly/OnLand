@@ -1,0 +1,13 @@
+{
+    "name": "Rust dev Container",   
+    "dockerComposeFile": [
+      "../docker-compose.devcontainer.yaml"
+    ],
+    "service": "rust",
+    "workspaceFolder": "/workspaces",
+    "remoteUser": "vscode",
+    "forwardPorts": [],
+    "shutdownAction": "none",
+    "postCreateCommand": "echo hello"
+  }
+  

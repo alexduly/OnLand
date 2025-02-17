@@ -1,0 +1,12 @@
+{
+    "name": "QGIS Preprocessing Container",   
+    "dockerComposeFile": [
+      "../docker-compose.devcontainer.yaml"
+    ],
+    "service": "preprocessing",
+    "workspaceFolder": "/workspaces",
+    "remoteUser": "root",
+    "forwardPorts": [],
+    "shutdownAction": "none"
+  }
+  
