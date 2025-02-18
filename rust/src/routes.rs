@@ -21,11 +21,7 @@ pub async fn coord_check(path: Path<(f64, f64)>, state: web::Data<AppState>) -> 
     println!("lat: {lat}, lng: {lng}");
 
     let point: geo::Point = point!([lng, lat]);
-
-    let mut found: bool = false;
-    if let Ok(read_guard) = &state.shapes.read(){
-        found = check_point(read_guard, point);
-    }
+    let found = check_point(&state.shapes, point);
 
     if found {
         return HttpResponse::Ok().finish();

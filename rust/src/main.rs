@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::{Arc, RwLock}};
+use std::{collections::HashMap};
 
 // 3rd partyy imports
 use actix_web::{guard, middleware::Logger, web, App, HttpServer};
 use env_logger;
-use geo::GeometryCollection;
+use geo::{Geometry, GeometryCollection};
 // env_logger::init_(env_logger::Env::new().default_filter_or("info"));
 
 // local imports
@@ -12,16 +12,16 @@ mod routes;
 mod services;
 
 struct AppState { 
-    shapes: Arc<RwLock<HashMap<String, GeometryCollection>>>
+    shapes: HashMap<String, GeometryCollection>,
 }
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    // app_data wraps variable in Arc, this is always read only ( For now! ) so do not need to wrap it in rwlock 
+    let state_polys: HashMap<String, GeometryCollection> = data::load_polys("/data/world.shp");
 
-
-    let state_polys = Arc::new(RwLock::new(data::load_polys("/data/world.shp")));
     // to do add GNU Terry Pratchett X-Clacks-Overhead 
     HttpServer::new(move  ||{
         App::new()

@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::sync::RwLockReadGuard;
-
 use geo::Contains;
 use geo::{GeometryCollection, Point};
 
@@ -23,7 +21,8 @@ fn find_bbox(point: Point, grid_size: f64) -> String {
 }
 
 pub fn check_point(
-    map: &RwLockReadGuard<'_, HashMap<String, GeometryCollection>>,
+    // map: &RwLockReadGuard<'_, HashMap<String, GeometryCollection>>,
+    map: &HashMap<String, GeometryCollection>,
     point: Point,
 ) -> bool {
     let bbox = find_bbox(point, 5.0); // need a way to set the grid size better
