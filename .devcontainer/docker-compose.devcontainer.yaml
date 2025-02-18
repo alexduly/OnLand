@@ -16,6 +16,7 @@ services:
       QGIS_SERVER_WMS_MAX_HEIGHT: 5000
       QGIS_SERVER_WMS_MAX_WIDTH: 5000
       PYTHONPATH: "/usr/share/qgis/python/plugins"
+      mode: "DEV"
     volumes:
       - ../preprocessing:/workspaces:cached
       - shared_data:/workspaces/data/output
