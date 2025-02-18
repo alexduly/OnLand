@@ -58,7 +58,16 @@ new_xmax = round_nearest_base(init_extent.xMaximum(), up=True)
 new_ymin = round_nearest_base(init_extent.yMinimum(), up=False)
 new_ymax = round_nearest_base(init_extent.yMaximum(), up=True)
 
-rounded_extent: QgsRectangle = QgsRectangle(new_xmin, new_ymin,new_xmax, new_ymax)
+# add in checks to make sure they are not out of bounds of the world. ie -/+90, -/+180
+
+
+# rounded_extent: QgsRectangle = QgsRectangle(
+    # new_xmin, new_ymin, new_xmax, new_ymax)
+    
+    
+    
+rounded_extent: QgsRectangle = QgsRectangle(
+    new_xmin, new_ymin, new_xmax, new_ymax)
 
 
 grid_layer: QgsVectorLayer = processing.run("native:creategrid",
@@ -71,7 +80,12 @@ grid_layer: QgsVectorLayer = processing.run("native:creategrid",
                                              'CRS': input_layer.crs(),
                                              'OUTPUT': 'TEMPORARY_OUTPUT'})["OUTPUT"]
 grid_layer.startEditing()
-grid_layer.addAttribute(QgsField("GridBBox", QMetaType.QString))
+
+grid_field_name = "Grid"
+grid_field = QgsField("Grid", QMetaType.QString)
+
+
+grid_layer.addAttribute(grid_field)
 
 
 output_layer = QgsVectorLayer(
@@ -85,9 +99,7 @@ provider.addAttributes(grid_layer.fields())
 
 output_layer.updateFields()
 
-
-count = 0 
-for feature in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), desc="Processing Features"):
+for feature in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), desc="Processing Features", leave=True):
     feature: QgsFeature
     grid_bbox = feature.geometry().boundingBox()
 
@@ -103,22 +115,19 @@ for feature in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), d
         "OUTPUT": "memory:",
     })["OUTPUT"]
     result_layer.startEditing()
-    result_layer.addAttribute(QgsField("GridBBox", QMetaType.QString))
+    result_layer.addAttribute(grid_field)
     result_layer.updateFields()
 
     for clipped_feature in result_layer.getFeatures():
         clipped_feature: QgsFeature
         # pyqgis reverse lat an dlong. x == long y == lat in pyqgis
-        clipped_feature["GridBBox"] = f"{grid_bbox.xMinimum()}:{grid_bbox.yMinimum()}:{grid_bbox.xMaximum()}:{grid_bbox.yMaximum()}"
+        clipped_feature[grid_field_name] = f"{grid_bbox.xMinimum()}:{grid_bbox.yMinimum()}:{grid_bbox.xMaximum()}:{grid_bbox.yMaximum()}"
         provider.addFeature(clipped_feature)
-    count +=1
-    
-    if count == 5:
-        break
 
 output_layer.updateExtents()
 options = QgsVectorFileWriter.SaveVectorOptions()
 options.driverName = "ESRI Shapefile"
+
 
 QgsVectorFileWriter.writeAsVectorFormatV3(
     output_layer, 'data/output/world.shp', QgsCoordinateTransformContext(), options)
