@@ -1,2 +1,2 @@
 FROM  qgis/qgis-server:stable
-RUN apt -y update && apt install python3-tqdm
+RUN apt -y update && apt install -y python3-tqdm python3-pandas

@@ -4,6 +4,8 @@ import os
 from generation import shapes
 from time import sleep
 
+from testgen import testgen
+
 def clean_output():
     print("Deleting all output files... you have 5 seconds to cancel")
 
@@ -13,7 +15,7 @@ def clean_output():
         
 
     
-    for dirpath, _, filenames in os.walk("data/output"):
+    for dirpath, _, filenames in os.walk("/workspaces/data/output"):
         for filename in filenames:
             file_path = os.path.join(dirpath, filename)
             try:
@@ -26,22 +28,22 @@ def clean_output():
 
 def main():
 
-    if os.getenv("mode", default="prod") == "DEV":
-        clean_output()
+    # if os.getenv("mode", default="prod") == "DEV":
+    #     clean_output()
     QgsApplication.setPrefixPath("/usr/share/qgis", True)
     sys.path.append('/usr/share/qgis/python/plugins')
 
     qgis = QgsApplication([], GUIenabled=False)
-    Prj = QgsProject.instance()
     qgis.initQgis()
 
-    Prj = QgsProject.instance()
+    Prj: QgsProject | None = QgsProject.instance()
     if Prj == None:
         print('Project didnt load, exiting')
         exit(1)
 
     #  TODO: fetch dataset via call, and invert using pyqgis ... 
-    shapes.process_polygons(filepath="data/input/realworld.shp", Prj=Prj)
+    # shapes.process_polygons(filepath="/workspaces/data/input/realworld.shp", proj=Prj)
+    testgen.create_test_points(proj=Prj, points_count = 2000) # set via env eventually
     qgis.exitQgis()
     return
 

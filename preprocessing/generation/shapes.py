@@ -13,7 +13,7 @@ def round_nearest_base(num, base=5, up=True):
         return math.floor(num / base) * base
 
 
-def process_polygons(filepath: str, Prj: QgsProject):
+def process_polygons(filepath: str, proj: QgsProject):
     import processing
     from processing.core.Processing import Processing
     Processing.initialize()
@@ -21,8 +21,10 @@ def process_polygons(filepath: str, Prj: QgsProject):
     input_layer = QgsVectorLayer(
         filepath, baseName="InputLayer", providerLib="ogr")
     if not input_layer.isValid():
-        print("Layer failed to load!")
+        print("Layer failed to load. Exiting...")
         exit(1)
+    else: 
+        print("Input shapefile loaded")
     init_extent = input_layer.extent()
 
     # print(f"xMax: {extent.xMaximum()}, xmin: {extent.xMinimum()}, ymax: {extent.yMaximum()}, ymin: {extent.yMinimum()}")
@@ -72,18 +74,20 @@ def process_polygons(filepath: str, Prj: QgsProject):
     if grid_layer.featureCount() == 0:
         print("No grids were generated, exiting...")
         exit(1)
+    else:
+        print("Grids created")
 
     grid_field_name = "Grid"
-    grid_field = QgsField(name="Grid", type=QMetaType.QString, len=254)
+    grid_field = QgsField(name=grid_field_name, type=QMetaType.QString, len=254)
     x_step_field = QgsField(name="XStep", type=QMetaType.Int)
     y_step_field = QgsField(name="YStep", type=QMetaType.Int)
     fields = QgsFields()
     fields.append([grid_field, x_step_field, y_step_field])
 
     output_layer = QgsVectorLayer(
-        "Polygon?crs=" + input_layer.crs().authid(), "Clipped Results", "memory")
+        "Polygon?crs=" + input_layer.crs().authid(), baseName="Output", providerLib="memory")
 
-    Prj.addMapLayers([grid_layer, input_layer, output_layer])
+    proj.addMapLayers([grid_layer, input_layer, output_layer]) # so test poiints can read all of this wihtout having to re read in files
 
     provider: QgsVectorDataProvider | None = output_layer.dataProvider()
     output_layer.startEditing()
@@ -103,7 +107,6 @@ def process_polygons(filepath: str, Prj: QgsProject):
 
     provider.addFeature(boundingBox)
 
-    count = 0
 
     for feature in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), desc="Processing Features", leave=True):
         feature: QgsFeature
@@ -130,21 +133,15 @@ def process_polygons(filepath: str, Prj: QgsProject):
             clipped_feature[grid_field_name] = f"{grid_bbox.xMinimum()}:{grid_bbox.yMinimum()}:{grid_bbox.xMaximum()}:{grid_bbox.yMaximum()}"
             provider.addFeature(clipped_feature)
 
-        count += 1
-        if count == 1:
-            break
+        
         
         
 
-    output_layer.updateExtents()
-    
-    
-    for feature in output_layer.getFeatures():
-        for attr in feature.fields():
-            print(attr)
-        break        
+    output_layer.updateExtents()   
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "ESRI Shapefile"
-
+    outputFile = "/workspaces/data/output/shapes/world.shp"
     QgsVectorFileWriter.writeAsVectorFormatV3(
-        output_layer, 'data/output/shapes/world.shp', QgsCoordinateTransformContext(), options)
+        layer=output_layer, fileName=outputFile, transformContext=QgsCoordinateTransformContext(), options=options)
+    
+    print(f"Processed polygons created and written to {outputFile}")
