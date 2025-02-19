@@ -1,8 +1,7 @@
-from ast import Pass
 from qgis.core import *
 import sys
 import os 
-from preprocessing import shapes
+from generation import shapes
 from time import sleep
 
 def clean_output():
@@ -29,7 +28,6 @@ def main():
 
     if os.getenv("mode", default="prod") == "DEV":
         clean_output()
-    # these i believe are required
     QgsApplication.setPrefixPath("/usr/share/qgis", True)
     sys.path.append('/usr/share/qgis/python/plugins')
 

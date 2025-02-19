@@ -1,3 +1,4 @@
+import os
 from qgis.core import *
 from qgis.PyQt.QtCore import QMetaType
 from tqdm import tqdm
@@ -10,8 +11,6 @@ def round_nearest_base(num, base=5, up=True):
         return math.ceil(num / base) * base
     else:
         return math.floor(num / base) * base
-
-
 
 
 def process_polygons(filepath: str, Prj: QgsProject):
@@ -29,26 +28,32 @@ def process_polygons(filepath: str, Prj: QgsProject):
     # print(f"xMax: {extent.xMaximum()}, xmin: {extent.xMinimum()}, ymax: {extent.yMaximum()}, ymin: {extent.yMinimum()}")
     # exit(1)
     # x == lng , y == lat!
-    new_xmin = round_nearest_base(init_extent.xMinimum(), up=False)
-    new_xmax = round_nearest_base(init_extent.xMaximum(), up=True)
-    new_ymin = round_nearest_base(init_extent.yMinimum(), up=False)
-    new_ymax = round_nearest_base(init_extent.yMaximum(), up=True)
+
+    x_step = int(os.getenv("X_STEP", default="5"))
+    y_step = int(os.getenv("X_STEP", default="5"))
+
+    new_xmin = round_nearest_base(
+        init_extent.xMinimum(), base=x_step,  up=False)
+    new_xmax = round_nearest_base(init_extent.xMaximum(), base=x_step, up=True)
+    new_ymin = round_nearest_base(
+        init_extent.yMinimum(), base=y_step, up=False)
+    new_ymax = round_nearest_base(init_extent.yMaximum(), base=y_step, up=True)
 
     # add in checks to make sure they are not out of bounds of the world. ie -/+90, -/+180
 
     if new_xmin < -180.0:
-        print(f"changing xmin {new_xmin}" )
+        print(f"changing xmin {new_xmin}")
         new_xmin = -180.0
     if new_xmax > 180.0:
-        print(f"changing xmin {new_xmax}" )
+        print(f"changing xmin {new_xmax}")
 
         new_xmax = 180.0
     if new_ymin < -90.0:
-        print(f"changing xmin {new_ymin}" )
+        print(f"changing xmin {new_ymin}")
 
         new_ymin = -90.0
     if new_ymax > 90.0:
-        print(f"changing xmin {new_ymax}" )
+        print(f"changing xmin {new_ymax}")
         new_ymax = 90.0
 
     rounded_extent: QgsRectangle = QgsRectangle(
@@ -57,18 +62,23 @@ def process_polygons(filepath: str, Prj: QgsProject):
     grid_layer: QgsVectorLayer = processing.run("native:creategrid",
                                                 {'TYPE': 2,
                                                  'EXTENT': rounded_extent,
-                                                 'HSPACING': 5,
-                                                 'VSPACING': 5,
+                                                 'HSPACING': x_step,
+                                                 'VSPACING': y_step,
                                                  'HOVERLAY': 0,
                                                  'VOVERLAY': 0,
                                                  'CRS': input_layer.crs(),
                                                  'OUTPUT': 'TEMPORARY_OUTPUT'})["OUTPUT"]
-    grid_layer.startEditing()
+
+    if grid_layer.featureCount() == 0:
+        print("No grids were generated, exiting...")
+        exit(1)
 
     grid_field_name = "Grid"
-    grid_field = QgsField("Grid", QMetaType.QString)
-
-    grid_layer.addAttribute(grid_field)
+    grid_field = QgsField(name="Grid", type=QMetaType.QString, len=254)
+    x_step_field = QgsField(name="XStep", type=QMetaType.Int)
+    y_step_field = QgsField(name="YStep", type=QMetaType.Int)
+    fields = QgsFields()
+    fields.append([grid_field, x_step_field, y_step_field])
 
     output_layer = QgsVectorLayer(
         "Polygon?crs=" + input_layer.crs().authid(), "Clipped Results", "memory")
@@ -76,18 +86,24 @@ def process_polygons(filepath: str, Prj: QgsProject):
     Prj.addMapLayers([grid_layer, input_layer, output_layer])
 
     provider: QgsVectorDataProvider | None = output_layer.dataProvider()
-    provider.addAttributes(grid_layer.fields())
+    output_layer.startEditing()
+    provider.addAttributes(fields)
     output_layer.updateFields()
 
-    # add bounding box to the output feature for ease of access for the rust server 
-    boundingBox = QgsFeature()
-    boundingBox.setGeometry(rounded_extent)
+    # add bounding box to the output feature for ease of access for the rust server
+    boundingBox = QgsFeature(fields)
+    if not boundingBox:
+        print("Unable to create bounding box")
+        exit(1)
+
+    boundingBox.setGeometry(QgsGeometry.fromRect(rounded_extent))
     boundingBox.setAttribute(grid_field_name, "Extent")
+    boundingBox.setAttribute("XStep", value=x_step)
+    boundingBox.setAttribute("YStep", value=y_step)
+
     provider.addFeature(boundingBox)
-    
-    
-    
-    count = 0 
+
+    count = 0
 
     for feature in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), desc="Processing Features", leave=True):
         feature: QgsFeature
@@ -114,14 +130,21 @@ def process_polygons(filepath: str, Prj: QgsProject):
             clipped_feature[grid_field_name] = f"{grid_bbox.xMinimum()}:{grid_bbox.yMinimum()}:{grid_bbox.xMaximum()}:{grid_bbox.yMaximum()}"
             provider.addFeature(clipped_feature)
 
-        count +=1
-        if count == 5:
+        count += 1
+        if count == 1:
             break
-   
+        
+        
 
     output_layer.updateExtents()
+    
+    
+    for feature in output_layer.getFeatures():
+        for attr in feature.fields():
+            print(attr)
+        break        
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "ESRI Shapefile"
 
     QgsVectorFileWriter.writeAsVectorFormatV3(
-        output_layer, 'data/output/world.shp', QgsCoordinateTransformContext(), options)
+        output_layer, 'data/output/shapes/world.shp', QgsCoordinateTransformContext(), options)
