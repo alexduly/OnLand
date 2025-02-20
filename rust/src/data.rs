@@ -45,5 +45,6 @@ pub fn load_polys(filename: &str)->  HashMap<String, GeometryCollection >{
             }
         }
     }
+    println!("Finished loading");
     return map;
 }

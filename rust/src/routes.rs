@@ -1,13 +1,20 @@
+use std::io::{stdout, Write};
+
 use actix_web::{web::{self, Path}, HttpResponse};
 use geo::point;
 use crate::{services::geospatial::check_point, AppState};
+use log::{debug,info};
 
 
 pub async fn info() -> HttpResponse {
-    return HttpResponse::Ok().body("Coming soon...");
+    return HttpResponse::Ok().body("Coming soon...\n");
 }
 
 pub async fn healthcheck() -> HttpResponse {
+    debug!("Healthcheck okay\n");
+    println!("this");
+    stdout().flush().unwrap();
+
     return HttpResponse::Ok().finish();
 }
 
@@ -18,8 +25,6 @@ pub async fn coord_check(path: Path<(f64, f64)>, state: web::Data<AppState>) -> 
     if lat >= 90.00 || lat <= -90.00 || lng >= 180.0 || lng <= -180.0 {
         return HttpResponse::BadRequest().body("Coordinates out of bounds\n");
     }
-    println!("lat: {lat}, lng: {lng}");
-
     let point: geo::Point = point!([lng, lat]);
     let found = check_point(&state.shapes, point);
 

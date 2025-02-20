@@ -10,6 +10,7 @@ dependencies = [
  "env_logger",
  "geo",
  "geo-types",
+ "log",
  "serde_json",
  "shapefile",
 ]

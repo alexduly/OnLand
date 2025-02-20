@@ -18,7 +18,7 @@ struct AppState {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
     // app_data wraps variable in Arc, this is always read only ( For now! ) so do not need to wrap it in rwlock 
     let state_polys: HashMap<String, GeometryCollection> = data::load_polys("/data/shapes/world.shp");
 
