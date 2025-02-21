@@ -1,4 +1,3 @@
-
 use actix_web::http::StatusCode;
 use actix_web::{
     get,
@@ -25,6 +24,13 @@ pub struct CoordCheckBadRes {
     pub lat: f64,
     pub lng: f64,
 }
+
+#[derive(Deserialize)]
+struct CoordIn {
+    lat: f64,
+    lng: f64,
+}
+
 #[get("/")]
 pub async fn get_info() -> HttpResponse {
     return HttpResponse::Ok().body("Coming soon...\n");
@@ -36,26 +42,40 @@ pub async fn healthcheck() -> HttpResponse {
 }
 
 #[get("/api/{lat}/{lng}")]
-pub async fn coord_check(path: Path<(f64, f64)>, state: web::Data<AppState>) -> impl Responder {
-    let (lat, lng) = path.into_inner();
-    // get bounds from shape file ( maybe put in as separate layer so deosnt get saved to grids by itself )
-    // default to this if not good
-    if lat >= 90.00 || lat <= -90.00 || lng >= 180.0 || lng <= -180.0 {
-        return HttpResponse::BadRequest().json(CoordCheckBadRes {
-            message: "Invalid Coordinates".to_string(),
-            status: StatusCode::BAD_REQUEST.as_u16(),
-            lat: lat,
-            lng: lng,
-        });
+pub async fn coord_check(
+    path: Option<Path<CoordIn>>,
+    state: web::Data<AppState>,
+) -> impl Responder {
+    match path {
+        Some(p) => {
+            // get bounds from shape file ( maybe put in as separate layer so deosnt get saved to grids by itself )
+            // default to this if not good
+            if p.lat >= 90.00 || p.lat <= -90.00 || p.lng >= 180.0 || p.lng <= -180.0 {
+                return HttpResponse::BadRequest().json(CoordCheckBadRes {
+                    message: "Coordinates out of range".to_string(),
+                    status: StatusCode::BAD_REQUEST.as_u16(),
+                    lat: p.lat,
+                    lng: p.lng,
+                });
+            }
+
+            debug!("Extent: {:?}", &state.extent);
+            let point: geo::Point = point!([p.lng, p.lat]);
+            let found: bool = check_point(&state.shapes, point);
+
+            return HttpResponse::Ok().json(CoordCheckRes {
+                land: found,
+                lat: p.lat,
+                lng: p.lng,
+            });
+        }
+        None => {
+            return HttpResponse::BadRequest().json(CoordCheckBadRes {
+                message: "Invalid Coordinates".to_string(),
+                status: StatusCode::BAD_REQUEST.as_u16(),
+                lat: 0.00,
+                lng: 0.00,
+            });
+        }
     }
-
-    debug!("Extent: {:?}", &state.extent);
-    let point: geo::Point = point!([lng, lat]);
-    let found: bool = check_point(&state.shapes, point);
-
-    return HttpResponse::Ok().json(CoordCheckRes {
-        land: found,
-        lat: lat,
-        lng: lng,
-    });
 }
