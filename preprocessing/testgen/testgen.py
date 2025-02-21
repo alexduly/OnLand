@@ -98,7 +98,7 @@ def create_test_points(proj: QgsProject, points_count: int):
         rows.append({
             "Lat": point.y(),
             "Lng": point.x(),
-            "Land": True,
+            "Land": "true", # for compatibility  use strings and use lower case
         })
         points_layer.updateFeature(points_feature)
 
@@ -113,13 +113,13 @@ def create_test_points(proj: QgsProject, points_count: int):
         rows.append({
             "Lat": point.y(),
             "Lng": point.x(),
-            "Land": False,
+            "Land": "false",
         })
         points_layer.updateFeature(points_feature)
 
 
     points_layer.commitChanges()
-    df = pd.DataFrame(rows, columns=["Lat", "Lng", "Land"])
+    df = pd.DataFrame(rows, columns=["lat", "lng", "land"])
     # df = df.sample(frac = 1).round(5) # shuffle the rows so that the land/water points are mixed up
 
     df.to_csv("/workspaces/data/output/test_data/test_points.csv", index=False)
