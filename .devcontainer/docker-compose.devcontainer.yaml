@@ -1,0 +1,31 @@
+services:
+  preprocessing:
+    image: "landwater-preprocessing"
+    build:
+      context: preprocessing/
+      dockerfile: Dockerfile.dev
+    container_name: preprocessing
+    platform: linux/amd64 # think this is neededa
+    environment:
+      # Do not run the embedded copy of nginx
+      SKIP_NGINX: "true"
+      XDG_RUNTIME: "/tmp/runtime-ubuntu"
+      mode: "DEV"
+    volumes:
+      - ../preprocessing:/workspaces:cached
+      - shared_data:/workspaces/data/output
+    restart: unless-stopped
+
+  rust:
+    image: "mcr.microsoft.com/devcontainers/rust:1-1-bullseye"
+    container_name: rust
+    platform: linux/amd64 # think this is
+    entrypoint: ["zsh", "-c", "while sleep 1000; do :; done"]
+    volumes:
+      - ../rust:/workspaces:cached
+      - shared_data:/data:ro
+
+    restart: unless-stopped
+
+volumes:
+  shared_data:

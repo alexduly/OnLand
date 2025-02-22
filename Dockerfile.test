@@ -1,0 +1,8 @@
+FROM rust:1.85-bullseye AS builder
+RUN cargo --version --verbose
+
+CMD [ "sleep" , "infinity" ]
+
+# WORKDIR /usr/src/rust
+# COPY rust/ .
+# RUN cargo install --path .

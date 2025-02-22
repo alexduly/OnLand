@@ -1,1 +1,4 @@
 QGIS/
+*.DS_STORE
+idea/
+*.vs_code/
