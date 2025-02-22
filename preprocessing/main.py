@@ -28,22 +28,22 @@ def clean_output():
 
 def main():
 
-    # if os.getenv("mode", default="prod") == "DEV":
-    #     clean_output()
+    if os.getenv("mode", default="prod") == "DEV":
+        clean_output()
     QgsApplication.setPrefixPath("/usr/share/qgis", True)
     sys.path.append('/usr/share/qgis/python/plugins')
 
     qgis = QgsApplication([], GUIenabled=False)
     qgis.initQgis()
-
     Prj: QgsProject | None = QgsProject.instance()
     if Prj == None:
         print('Project didnt load, exiting')
         exit(1)
 
     #  TODO: fetch dataset via call, and invert using pyqgis ... 
-    # shapes.process_polygons(filepath="/workspaces/data/input/realworld.shp", proj=Prj)
-    testgen.create_test_points(proj=Prj, points_count = 2000) # set via env eventually
+    shapes.process_polygons(filepath="data/input/realworld.shp", proj=Prj)
+    if os.getenv("mode", default="prod") == "DEV": # dont need test points  for prod 
+        testgen.create_test_points(proj=Prj, points_count = 2000) # set via env eventually
     qgis.exitQgis()
     return
 

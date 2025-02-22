@@ -1,2 +1,21 @@
-FROM  qgis/qgis-server:stable
+# FROM debian:bookworm-slim
+
+# # Set environment variables for QGIS
+# ENV DEBIAN_FRONTEND=noninteractive
+# ENV QGIS_VERSION="3.34"
+# ENV QT_QPA_PLATFORM='offscreen'
+
+# ENV mode="DEV" 
+
+# # Install required dependencies
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#    qgis python3-qgis python3-pip \
+#     python3-tqdm python3-pandas \
+#     && rm -rf /var/lib/apt/lists/*
+
+
+# CMD ["sleep", "infinity"]
+
+FROM qgis/qgis-server:stable
 RUN apt -y update && apt install -y python3-tqdm python3-pandas
+ENV QT_QPA_PLATFORM=offscreen

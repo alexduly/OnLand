@@ -1,0 +1,29 @@
+FROM --platform=linux/amd64 qgis/qgis-server:stable AS preprocessing
+RUN apt -y update && apt install -y python3-tqdm python3-pandas
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SKIP_NGINX="true"
+ENV Display=":0"
+ENV QT_QPA_PLATFORM=offscreen
+ENV XDG_RUNTIME_DIR="/tmp/runtime-root"
+
+
+WORKDIR /workspaces
+COPY preprocessing/ /workspaces/
+RUN python3 main.py
+
+FROM rust:1.85-bookworm AS builder
+RUN apt update && apt install -y musl-tools
+WORKDIR /app
+COPY rust/ .
+RUN cargo build --release
+RUN strip target/release/on_land
+
+
+FROM debian:bookworm-20250203-slim AS final
+
+RUN mkdir -p /data/shapes
+COPY --from=builder /app/target/release/on_land .
+COPY --from=preprocessing /workspaces/data/output/shapes/* /data/shapes/
+EXPOSE 8080
+CMD ["./on_land"]

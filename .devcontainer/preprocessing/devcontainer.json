@@ -5,7 +5,6 @@
     ],
     "service": "preprocessing",
     "workspaceFolder": "/workspaces",
-    "remoteUser": "ubuntu",
     "forwardPorts": [],
     "shutdownAction": "none",
     "customizations": {

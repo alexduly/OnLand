@@ -19,11 +19,14 @@ pub struct AppState {
 
 
 #[actix_web::main]
-pub async fn run_http_server() -> std::io::Result<()> {
+pub async fn run_http_server(host: &str, port: &str) -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
     // app_data wraps variable in Arc, this is always read only ( For now! ) so do not need to wrap it in rwlock 
     let state_polys: HashMap<String, GeometryCollection> = data::load_polys("/data/shapes/world.shp");
     let extent = state_polys["Extent"].bounding_rect().expect("Failed to load extent");
+
+    let addr = format!("{}:{}", host, port);
+
     // to do add GNU Terry Pratchett X-Clacks-Overhead 
     HttpServer::new(move  ||{
         App::new()
@@ -40,7 +43,7 @@ pub async fn run_http_server() -> std::io::Result<()> {
             })
         )
     })
-    .bind("127.0.0.1:8080")?
+    .bind(addr)?
     .run()
     .await
 }
