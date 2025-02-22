@@ -82,7 +82,7 @@ This project is licensed under the [MIT License](LICENSE).
 ## Sources
  | **Map**           | **Attribution**                                                                                                                                   |
 |-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| World Water Bodies [Available at: https://www.arcgis.com/home/group.html?id=24838c2d95e14dd18c25e9bad55a7f82#overview] | ESRI, Garmin Available at: https://www.arcgis.com/home/group.html?id=24838c2d95e14dd18c25e9bad55a7f82#overview  |
+| World Water Bodies | ESRI, Garmin Available at: https://www.arcgis.com/home/group.html?id=24838c2d95e14dd18c25e9bad55a7f82#overview  |
 
 ---
 
