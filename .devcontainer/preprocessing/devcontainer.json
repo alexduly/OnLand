@@ -6,6 +6,7 @@
     "service": "preprocessing",
     "workspaceFolder": "/workspaces",
     "forwardPorts": [],
+    "remoteUser": "ubuntu",
     "shutdownAction": "none",
     "customizations": {
         "vscode": {
