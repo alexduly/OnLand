@@ -172,4 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# additional
+*.gpkg
 symbology-style.db
