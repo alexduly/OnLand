@@ -2,6 +2,8 @@ from qgis.core import *
 import pandas as pd
 from tqdm import tqdm
 from qgis.PyQt.QtCore import QMetaType
+import processing
+from processing.core.Processing import Processing
 
 # add in a function to load test data via a file that runs if the proj is empty. will save me having to regernate grids every time
 
@@ -22,9 +24,8 @@ def create_test_points(proj: QgsProject, points_count: int):
     Passing project reference, instead of reading in file as in prod this will run as a oner and should save resource reading in data?
     but open to changing/ playing around with
     '''
-    import processing
-    from processing.core.Processing import Processing
     Processing.initialize()
+
 
     output = proj.mapLayersByName("Output")
 
@@ -34,14 +35,13 @@ def create_test_points(proj: QgsProject, points_count: int):
     else:
         output_layer = output[0]
 
-
     points_layer: QgsVectorLayer = processing.run(algOrName="native:randompointsinextent",
-                                                 parameters={"EXTENT": output_layer.extent(),
-                                                             "POINTS_NUMBER": points_count,
-                                                             "MIN_DISTANCE": 0,
-                                                             "TARGET_CRS": output_layer.crs(),
-                                                             "MAX_ATTEMPTS": 200,
-                                                             "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
+                                                  parameters={"EXTENT": output_layer.extent(),
+                                                              "POINTS_NUMBER": points_count,
+                                                              "MIN_DISTANCE": 0,
+                                                              "TARGET_CRS": output_layer.crs(),
+                                                              "MAX_ATTEMPTS": 200,
+                                                              "OUTPUT": "TEMPORARY_OUTPUT"})["OUTPUT"]
     if not points_layer.isValid():
         print("Invalid points layer generated. Exiting...")
         exit(1)
@@ -79,13 +79,11 @@ def create_test_points(proj: QgsProject, points_count: int):
     land_field = QgsField(name="Land", type=QMetaType.Bool)
 
     points_layer.startEditing()
-    
+
     points_layer.addAttribute(land_field)
 
     points_layer.updateFields()
-    
-  
-    
+
     rows = []
     for points_feature in tqdm(points_layer.selectedFeatures(), total=points_layer.selectedFeatureCount(), desc="Processing Land points", leave=True):
         pointsFtr: QgsFeature
@@ -98,7 +96,7 @@ def create_test_points(proj: QgsProject, points_count: int):
         rows.append({
             "Lat": point.y(),
             "Lng": point.x(),
-            "Land": "true", # for compatibility  use strings and use lower case
+            "Land": "true",  # for compatibility  use strings and use lower case
         })
         points_layer.updateFeature(points_feature)
 
@@ -117,7 +115,6 @@ def create_test_points(proj: QgsProject, points_count: int):
         })
         points_layer.updateFeature(points_feature)
 
-
     points_layer.commitChanges()
     df = pd.DataFrame(rows, columns=["lat", "lng", "land"])
     # df = df.sample(frac = 1).round(5) # shuffle the rows so that the land/water points are mixed up
@@ -126,7 +123,6 @@ def create_test_points(proj: QgsProject, points_count: int):
 
     # points.
     # debug write to shape file
-    
 
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "ESRI Shapefile"

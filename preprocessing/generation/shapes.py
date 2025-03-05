@@ -1,5 +1,6 @@
 import os
 from qgis.PyQt.QtCore import QMetaType
+import numpy as np
 from tqdm import tqdm
 import math
 from qgis.core import (
@@ -9,13 +10,30 @@ from qgis.core import (
     QgsGeometry,
     QgsProject,
     QgsRectangle,
+    QgsVectorDataProvider,
     QgsVectorFileWriter,
     QgsVectorLayer,
     edit,
-    QgsCoordinateTransformContext
+    QgsCoordinateTransformContext,
+    QgsApplication
 
 )
+from typing import Literal
+import processing
+from processing.core.Processing import Processing
+import warnings
+import multiprocessing as mp
 
+
+from functools import partial
+
+
+
+MAX_WORKERS = mp.cpu_count()
+
+
+warnings.filterwarnings("ignore", category=UserWarning,
+                        message=".*file size.*")
 
 
 def round_nearest_base(num, base=5, up=True):
@@ -26,23 +44,117 @@ def round_nearest_base(num, base=5, up=True):
         return math.floor(num / base) * base
 
 
-def process_polygons(filepath: str, proj: QgsProject):
-    import processing
-    from processing.core.Processing import Processing
+def clip_poly(grids: QgsFeature, crs, input_layer, input_biome, fields, x_step, y_step):
+    
+    result = []
+
+    for grid in grids.getFeatures():
+
+        grid_bbox = grid.geometry().boundingBox()
+        # feature["GridBBox"] = f"{boundingBox}"
+        overlay_single = QgsVectorLayer(
+            path="Polygon", crs=crs, baseName="temp", providerLib="memory")
+        provider_single: QgsVectorDataProvider | None = overlay_single.dataProvider()
+        provider_single.addFeatures([grid])
+
+        result_layer = processing.run("native:clip", {
+            "INPUT": input_layer,
+            "OVERLAY": overlay_single,
+            'CRS': crs,
+            "OUTPUT": "memory:",
+        })["OUTPUT"]
+
+        if input_biome == "water":
+            result_layer = processing.run("native:difference", {
+                'INPUT': overlay_single,
+                'OVERLAY': result_layer, 'OUTPUT': 'TEMPORARY_OUTPUT', 'GRID_SIZE': None})["OUTPUT"]
+        with edit(result_layer):
+            for field in fields:
+                result_layer.addAttribute(field)
+
+        for clipped_feature in result_layer.getFeatures():
+            clipped_feature: QgsFeature
+            # pyqgis reverse lat an dlong. x == long y == lat in pyqgis
+            new = QgsFeature(fields)
+
+            if not clipped_feature.isValid():
+                try:
+                    fixed_geometry = clipped_feature.makeValid()
+                    new.setGeometry(fixed_geometry.geometry())
+
+                except:
+                    print("unable to repair invalid feature, skipping")
+                    continue
+            else:
+                new.setGeometry(clipped_feature.geometry())
+            if new.geometry().area() == 0:
+                tqdm.write("skipping as area == 0")
+                continue
+            new.setAttribute(
+                # lng  min               lat min                      lng max         lat max
+                "Grid", f"{grid_bbox.xMinimum()}:{grid_bbox.yMinimum()}:{grid_bbox.xMaximum()}:{grid_bbox.yMaximum()}")
+            new.setAttribute("XStep", value=x_step)
+            new.setAttribute("YStep", value=y_step)
+            result.append(new)
+        # output_layer.commitChanges()
+        # pbar.update(1)
+
+
+def process_polygons(filepath: str, input_biome: Literal["land", "water"], proj: QgsProject):
+    '''
+    Reads in input polgyon, generates grids, then clips out and assigns and ID for the rust server to use as the lookup
+    to narrow down which polygons to search through. 
+
+
+    '''
     Processing.initialize()
 
-    input_layer = QgsVectorLayer(
-        filepath, baseName="InputLayer", providerLib="ogr")
-    if not input_layer.isValid():
-        print(f"Input Layer failed to load from {filepath}. Exiting...")
+    shp_files = [each for each in os.listdir(
+        filepath) if each.endswith('.shp')]
+
+    if len(shp_files) != 1:
+        print(f"{len(shp_files)} shp files ({shp_files}) found, please ensure there is exactly one in data/input")
         exit(1)
+
+    print(f"Found shp file: {shp_files[0]}")
+    input_layer = QgsVectorLayer(
+        path=filepath+shp_files[0], baseName="InputLayer", providerLib="ogr")
+
+    if not input_layer.isValid():
+        print("failed to open shapefile, trying to fix")
+        tmp = processing.run("native:repairshapefile", {'INPUT': filepath})
+        print(tmp)
+        input_layer = QgsVectorLayer(
+            path=filepath, baseName="InputLayer", providerLib="ogr")
+
+        if not input_layer.isValid():
+            print(
+                f"Input Layer failed to load from {filepath} and could not repair. Exiting...")
+            exit(1)
     else:
         print("Input shapefile loaded")
-    init_extent = input_layer.extent()
+    fix_count = 0
+    with edit(input_layer):
+        # try and change this to only run if an error gets caught?
+        print("Checking geometry validity, will repair if necessary")
+        for feature in tqdm(input_layer.getFeatures(), total=input_layer.featureCount(), desc=f"Validating input geometry. Fixed: {fix_count}", leave=True):
+            if not feature.geometry().isGeosValid():
+                try:
+                    fixed_geometry = feature.geometry().makeValid()
 
-    # print(f"xMax: {extent.xMaximum()}, xmin: {extent.xMinimum()}, ymax: {extent.yMaximum()}, ymin: {extent.yMinimum()}")
-    # exit(1)
-    # x == lng , y == lat!
+                    feature.setGeometry(fixed_geometry)
+                    # Update the layer's feature in the data provider
+                    input_layer.updateFeature(feature)
+                    fix_count += 1
+                    tqdm.write(
+                        f"Feature {feature.id()} geometry was fixed. Total fixed == {fix_count}")
+                except Exception as e:
+                    tqdm.write(
+                        f"Failed to fix feature {feature.id()}: {e}. Total fixed == {fix_count}")
+
+    print("Checks complete")
+
+    init_extent = input_layer.extent()
 
     x_step = int(os.getenv("X_STEP", default="5"))
     y_step = int(os.getenv("X_STEP", default="5"))
@@ -89,57 +201,32 @@ def process_polygons(filepath: str, proj: QgsProject):
         exit(1)
     else:
         print("Grids created")
-
     output_layer = QgsVectorLayer(
-        "MultiPolygon?crs=" + input_layer.crs().authid(), baseName="Output", providerLib="memory")
+        "MultiPolygon", crs=input_layer.crs(), baseName="Output", providerLib="memory")
 
     #  so test poiints can read all of this wihtout having to re read in files
     proj.addMapLayers([grid_layer, input_layer, output_layer])
 
-    processed = []
     x_step_field = QgsField(name="XStep", type=QMetaType.Int)
 
     grid_field_name = "Grid"
-    grid_field = QgsField(name=grid_field_name, type=QMetaType.QString, len=254)
+    grid_field = QgsField(name=grid_field_name,
+                          type=QMetaType.QString, len=254)
     y_step_field = QgsField(name="YStep", type=QMetaType.Int)
     fields = QgsFields()
     fields.append([grid_field, x_step_field, y_step_field])
+    processed = []
+    
+    with mp.Pool(processes=MAX_WORKERS) as pool:
+                # results_list = pool.map(foo, inputs)  # Collect results in a list
+                clip_poly_partial = partial(clip_poly,  crs=grid_layer.crs(), input_layer=input_layer, input_biome=input_biome, fields=fields, x_step=x_step, y_step=y_step) #, pbar=pbar)
+                print('here')
+                # for grid in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), desc="Processing Features", leave=True):
+                res =  pool.map(clip_poly_partial,grid_layer.getFeatures(), chunksize=(grid_layer.featureCount()/MAX_WORKERS))
+        # clip_poly(grid=grid, crs=grid_layer.crs(), input_layer=input_layer, input_biome=input_biome, fields=fields, x_step=x_step,y_step=y_step )
+                print("result appended")
+                processed.append(list(np.concatenate(res).flat))
 
-    for feature in tqdm(grid_layer.getFeatures(), total=grid_layer.featureCount(), desc="Processing Features", leave=True):
-        feature: QgsFeature
-        grid_bbox = feature.geometry().boundingBox()
-        # feature["GridBBox"] = f"{boundingBox}"
-        overlay_single = QgsVectorLayer(
-            "Polygon?crs=" + grid_layer.crs().authid(), "temp", "memory")
-        provider_single = overlay_single.dataProvider()
-        provider_single.addFeatures([feature])
-
-        result_layer = processing.run("native:clip", {
-            "INPUT": input_layer,
-            "OVERLAY": overlay_single,
-            'CRS': output_layer.crs(),
-            "OUTPUT": "memory:",
-        })["OUTPUT"]
-        with edit(result_layer):
-            for field in fields:
-                result_layer.addAttribute(field)
-
-        for clipped_feature in result_layer.getFeatures():
-            clipped_feature: QgsFeature
-            # pyqgis reverse lat an dlong. x == long y == lat in pyqgis
-            new = QgsFeature(fields)
-            new.setGeometry(clipped_feature.geometry())
-            new.setAttribute(
-                                     # lng  min               lat min                      lng max         lat max
-                "Grid", f"{grid_bbox.xMinimum()}:{grid_bbox.yMinimum()}:{grid_bbox.xMaximum()}:{grid_bbox.yMaximum()}")
-            new.setAttribute("XStep", value=x_step)
-            new.setAttribute("YStep", value=y_step)
-            processed.append(new)
-            # output_layer.commitChanges()
-        
-     
-        
-        
     print("Polygons clipped, now adding to layer and saving ")
     with edit(output_layer):
         for field in fields:
@@ -158,12 +245,12 @@ def process_polygons(filepath: str, proj: QgsProject):
         for item in processed:
             res = output_layer.addFeature(feature=item)
             if not res:
-                print(f"Feature could not be added {item.geometry()}") # not sure if this shoudl cause a panic or not
+                # not sure if this shoudl cause a panic or not
+                print(f"Feature could not be added {item.geometry()}")
         output_layer.updateExtents()
-        
+
     # print(output_layer.featureCount())
     print("All processed polygons added to layer")
-
 
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "ESRI Shapefile"
